@@ -71,15 +71,6 @@
 
   <!-- 3) Embed NoSleep.js (minified) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.3.0/NoSleep.min.js"></script>
-  
-  <script>
-  /*!
-   * NoSleep.js v0.12.0 - git.io/vfn01
-   * Enable wake lock in Android and iOS web browsers.
-   * @license MIT
-   */
-  var NoSleep=function(){var t=this;this.noSleepTimer=null,this.video=document.createElement("video"),this.video.setAttribute("title","No Sleep"),this.video.setAttribute("playsinline",""),this.video.setAttribute("muted","true"),this.video.setAttribute("loop",""),this.video.src=this.createSrc(),this.enable=function(e){void 0===e&&(e=!0);var i=function(){t.video.play().then(function(){e&&t.addSourceToVideo(),t.noSleepTimer=setTimeout(function(){t.enable(e)},15000)}).catch(function(n){console.error(n)})};t.disable(),i()},this.disable=function(){clearTimeout(t.noSleepTimer),t.noSleepTimer=null,t.removeSourceFromVideo(),t.video.pause()},this.addSourceToVideo=function(){0===this.video.src.indexOf("data:video/mp4")||0===this.video.src.indexOf("blob:")||0===this.video.src.indexOf("file:")||this.video.src.indexOf(window.location.host)!==-1||this.video.setAttribute("src",this.createSrc())},this.removeSourceFromVideo=function(){this.video.removeAttribute("src"),this.video.load()},this.createSrc=function(){var t="data:video/mp4;base64,AAAAFGZ0eXBpc29tAAACAGlzb2... (shortened) ...AAA==";return t}};
-  </script>
 
   <!-- 4) Our main training timer code -->
   <script>
