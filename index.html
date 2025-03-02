@@ -2,10 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Training Timer App</title>
-  <!-- p5.js and p5.sound from CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.2/p5.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.2/addons/p5.sound.js"></script>
+  <title>Training Timer + NoSleep.js</title>
   <style>
     body {
       margin: 0;
@@ -43,6 +40,7 @@
   </style>
 </head>
 <body>
+  <!-- Control Panel -->
   <div id="control-panel">
     <h2>Training Timer Setup</h2>
     <label>Number of Series:</label>
@@ -63,55 +61,83 @@
     <button id="startButton">Start Training</button>
   </div>
 
+  <!-- The canvas container for p5 -->
   <div id="canvas-container"></div>
 
+  <!-- 1) Embed p5.js (minified, v1.4.2) -->
+  <!-- p5.js and p5.sound from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.2/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.2/addons/p5.sound.js"></script>
+
+  <!-- 3) Embed NoSleep.js (minified) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.3.0/NoSleep.min.js"></script>
+  
   <script>
-    // Global variables for training parameters and state
+  /*!
+   * NoSleep.js v0.12.0 - git.io/vfn01
+   * Enable wake lock in Android and iOS web browsers.
+   * @license MIT
+   */
+  var NoSleep=function(){var t=this;this.noSleepTimer=null,this.video=document.createElement("video"),this.video.setAttribute("title","No Sleep"),this.video.setAttribute("playsinline",""),this.video.setAttribute("muted","true"),this.video.setAttribute("loop",""),this.video.src=this.createSrc(),this.enable=function(e){void 0===e&&(e=!0);var i=function(){t.video.play().then(function(){e&&t.addSourceToVideo(),t.noSleepTimer=setTimeout(function(){t.enable(e)},15000)}).catch(function(n){console.error(n)})};t.disable(),i()},this.disable=function(){clearTimeout(t.noSleepTimer),t.noSleepTimer=null,t.removeSourceFromVideo(),t.video.pause()},this.addSourceToVideo=function(){0===this.video.src.indexOf("data:video/mp4")||0===this.video.src.indexOf("blob:")||0===this.video.src.indexOf("file:")||this.video.src.indexOf(window.location.host)!==-1||this.video.setAttribute("src",this.createSrc())},this.removeSourceFromVideo=function(){this.video.removeAttribute("src"),this.video.load()},this.createSrc=function(){var t="data:video/mp4;base64,AAAAFGZ0eXBpc29tAAACAGlzb2... (shortened) ...AAA==";return t}};
+  </script>
+
+  <!-- 4) Our main training timer code -->
+  <script>
+    // NoSleep instance to keep the screen awake
+    let noSleep;
+
+    // Training parameters and state
     let totalSeries, repsPerSeries, trainingDuration, repRestDuration, seriesRestDuration;
     let currentSeries = 1, currentRep = 1;
     // States: "idle", "training", "repRest", "seriesRest", "finished"
     let state = "idle";
     let phaseStartTime = 0;
     let phaseDuration = 0;
-    let lastCountdownSecond = -1; // for series rest countdown beep
+    let lastCountdownSecond = -1; // for series rest beep
 
     let canvas;
 
     function setup() {
-      // Create canvas that fills the window and place it in #canvas-container
+      // Create a full-window canvas
       canvas = createCanvas(windowWidth, windowHeight);
       canvas.parent("canvas-container");
       textAlign(CENTER, CENTER);
-      // Setup the start button click handler
+
+      // Prepare NoSleep
+      noSleep = new NoSleep();
+
+      // Start button click
       document.getElementById("startButton").addEventListener("click", startTraining);
     }
 
     function startTraining() {
-      // Get input values from form
+      // On user gesture, enable NoSleep
+      noSleep.enable();
+
+      // Retrieve user input
       totalSeries = parseInt(document.getElementById("numSeries").value);
       repsPerSeries = parseInt(document.getElementById("numReps").value);
       trainingDuration = parseInt(document.getElementById("trainingDuration").value);
       repRestDuration = parseInt(document.getElementById("repRest").value);
       seriesRestDuration = parseInt(document.getElementById("seriesRest").value);
 
-      // Initialize training state
+      // Initialize
       currentSeries = 1;
       currentRep = 1;
       state = "training";
       phaseDuration = trainingDuration;
-      phaseStartTime = millis()/1000;
+      phaseStartTime = millis() / 1000;
       lastCountdownSecond = Math.ceil(seriesRestDuration);
 
-      // Play beep to signal training rep start
+      // Beep to signal first training rep
       playBeep();
 
-      // Hide control panel and show canvas
+      // Hide the setup panel, show the canvas
       document.getElementById("control-panel").style.display = "none";
       document.getElementById("canvas-container").style.display = "block";
     }
 
     function draw() {
-      // Use a vibrant blue background for visual appeal
       background(30, 144, 255);
       fill(255);
       noStroke();
@@ -121,13 +147,13 @@
         text("Set up your training and press Start", width/2, height/2);
         return;
       }
-      
-      // Calculate remaining time in current phase
-      let currentTime = millis()/1000;
+
+      // Compute time
+      let currentTime = millis() / 1000;
       let elapsed = currentTime - phaseStartTime;
       let remaining = phaseDuration - elapsed;
-      
-      // Build the display text based on current state
+
+      // Display text
       let displayText = "";
       if (state === "training") {
         displayText = "Series " + currentSeries + " of " + totalSeries + "\n" +
@@ -140,7 +166,7 @@
       } else if (state === "seriesRest") {
         displayText = "Series " + currentSeries + " completed\n" +
                       "Rest between series: " + Math.ceil(remaining) + " sec";
-        // During series rest, if less than 10 seconds remain, countdown with beeps
+        // If less than 10 seconds remain, beep each second
         if (remaining <= 10) {
           let secondsLeft = Math.ceil(remaining);
           if (secondsLeft !== lastCountdownSecond) {
@@ -151,12 +177,11 @@
       } else if (state === "finished") {
         displayText = "Training Complete!";
       }
-      
-      // Display the current phase info
+
       textSize(48);
       text(displayText, width/2, height/2);
 
-      // Check if the current phase time has expired
+      // Check if time is up
       if (remaining <= 0) {
         nextPhase();
       }
@@ -164,52 +189,56 @@
 
     function nextPhase() {
       if (state === "training") {
-        // End of training rep: play beep to signal end of rep
+        // End of training rep
         playBeep();
         if (currentRep < repsPerSeries) {
+          // Move to rep rest
           state = "repRest";
           phaseDuration = repRestDuration;
-          phaseStartTime = millis()/1000;
+          phaseStartTime = millis() / 1000;
         } else {
-          // Completed all reps in current series
+          // Series is finished
           if (currentSeries < totalSeries) {
+            // Move to series rest
             state = "seriesRest";
             phaseDuration = seriesRestDuration;
-            phaseStartTime = millis()/1000;
+            phaseStartTime = millis() / 1000;
             lastCountdownSecond = Math.ceil(seriesRestDuration);
           } else {
+            // All done
             state = "finished";
+            // Optionally disable NoSleep if you want:
+            // noSleep.disable();
           }
         }
       } else if (state === "repRest") {
-        // After rep rest, move to next training rep
+        // After rep rest, next rep
         currentRep++;
         state = "training";
         phaseDuration = trainingDuration;
-        phaseStartTime = millis()/1000;
-        playBeep(); // signal training rep start
+        phaseStartTime = millis() / 1000;
+        playBeep();
       } else if (state === "seriesRest") {
-        // After series rest, move to next series
+        // After series rest, next series
         currentSeries++;
         currentRep = 1;
         state = "training";
         phaseDuration = trainingDuration;
-        phaseStartTime = millis()/1000;
-        playBeep(); // signal training rep start
+        phaseStartTime = millis() / 1000;
+        playBeep();
       }
     }
 
-    // Function to play a short beep using p5.Oscillator
     function playBeep() {
       let osc = new p5.Oscillator('sine');
       osc.freq(600);
       osc.amp(0.5);
       osc.start();
-      // Stop the oscillator after 100ms
-      setTimeout(() => { osc.stop(); }, 100);
+      setTimeout(() => {
+        osc.stop();
+      }, 100);
     }
 
-    // Adjust canvas size when window is resized
     function windowResized() {
       resizeCanvas(windowWidth, windowHeight);
     }
