@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Training Timer App</title>
+  <!-- p5.js and p5.sound from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.2/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.2/addons/p5.sound.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #f0f0f0;
+    }
+    #control-panel {
+      padding: 20px;
+      background: #fff;
+      max-width: 500px;
+      margin: 20px auto;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    #control-panel h2 {
+      text-align: center;
+    }
+    #control-panel label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+    }
+    #control-panel input, #control-panel button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #canvas-container {
+      display: none; /* hidden until training starts */
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="control-panel">
+    <h2>Training Timer Setup</h2>
+    <label>Number of Series:</label>
+    <input type="number" id="numSeries" value="3" min="1">
+    
+    <label>Repetitions per Series:</label>
+    <input type="number" id="numReps" value="10" min="1">
+    
+    <label>Training Duration (seconds per rep):</label>
+    <input type="number" id="trainingDuration" value="7" min="1">
+    
+    <label>Rest Between Reps (seconds):</label>
+    <input type="number" id="repRest" value="3" min="0">
+    
+    <label>Rest Between Series (seconds):</label>
+    <input type="number" id="seriesRest" value="150" min="0">
+    
+    <button id="startButton">Start Training</button>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script>
+    // Global variables for training parameters and state
+    let totalSeries, repsPerSeries, trainingDuration, repRestDuration, seriesRestDuration;
+    let currentSeries = 1, currentRep = 1;
+    // States: "idle", "training", "repRest", "seriesRest", "finished"
+    let state = "idle";
+    let phaseStartTime = 0;
+    let phaseDuration = 0;
+    let lastCountdownSecond = -1; // for series rest countdown beep
+
+    let canvas;
+
+    function setup() {
+      // Create canvas that fills the window and place it in #canvas-container
+      canvas = createCanvas(windowWidth, windowHeight);
+      canvas.parent("canvas-container");
+      textAlign(CENTER, CENTER);
+      // Setup the start button click handler
+      document.getElementById("startButton").addEventListener("click", startTraining);
+    }
+
+    function startTraining() {
+      // Get input values from form
+      totalSeries = parseInt(document.getElementById("numSeries").value);
+      repsPerSeries = parseInt(document.getElementById("numReps").value);
+      trainingDuration = parseInt(document.getElementById("trainingDuration").value);
+      repRestDuration = parseInt(document.getElementById("repRest").value);
+      seriesRestDuration = parseInt(document.getElementById("seriesRest").value);
+
+      // Initialize training state
+      currentSeries = 1;
+      currentRep = 1;
+      state = "training";
+      phaseDuration = trainingDuration;
+      phaseStartTime = millis()/1000;
+      lastCountdownSecond = Math.ceil(seriesRestDuration);
+
+      // Play beep to signal training rep start
+      playBeep();
+
+      // Hide control panel and show canvas
+      document.getElementById("control-panel").style.display = "none";
+      document.getElementById("canvas-container").style.display = "block";
+    }
+
+    function draw() {
+      // Use a vibrant blue background for visual appeal
+      background(30, 144, 255);
+      fill(255);
+      noStroke();
+
+      if (state === "idle") {
+        textSize(32);
+        text("Set up your training and press Start", width/2, height/2);
+        return;
+      }
+      
+      // Calculate remaining time in current phase
+      let currentTime = millis()/1000;
+      let elapsed = currentTime - phaseStartTime;
+      let remaining = phaseDuration - elapsed;
+      
+      // Build the display text based on current state
+      let displayText = "";
+      if (state === "training") {
+        displayText = "Series " + currentSeries + " of " + totalSeries + "\n" +
+                      "Repetition " + currentRep + " of " + repsPerSeries + "\n" +
+                      "Training: " + Math.ceil(remaining) + " sec";
+      } else if (state === "repRest") {
+        displayText = "Series " + currentSeries + " of " + totalSeries + "\n" +
+                      "Repetition " + currentRep + " completed\n" +
+                      "Rest between reps: " + Math.ceil(remaining) + " sec";
+      } else if (state === "seriesRest") {
+        displayText = "Series " + currentSeries + " completed\n" +
+                      "Rest between series: " + Math.ceil(remaining) + " sec";
+        // During series rest, if less than 10 seconds remain, countdown with beeps
+        if (remaining <= 10) {
+          let secondsLeft = Math.ceil(remaining);
+          if (secondsLeft !== lastCountdownSecond) {
+            playBeep();
+            lastCountdownSecond = secondsLeft;
+          }
+        }
+      } else if (state === "finished") {
+        displayText = "Training Complete!";
+      }
+      
+      // Display the current phase info
+      textSize(48);
+      text(displayText, width/2, height/2);
+
+      // Check if the current phase time has expired
+      if (remaining <= 0) {
+        nextPhase();
+      }
+    }
+
+    function nextPhase() {
+      if (state === "training") {
+        // End of training rep: play beep to signal end of rep
+        playBeep();
+        if (currentRep < repsPerSeries) {
+          state = "repRest";
+          phaseDuration = repRestDuration;
+          phaseStartTime = millis()/1000;
+        } else {
+          // Completed all reps in current series
+          if (currentSeries < totalSeries) {
+            state = "seriesRest";
+            phaseDuration = seriesRestDuration;
+            phaseStartTime = millis()/1000;
+            lastCountdownSecond = Math.ceil(seriesRestDuration);
+          } else {
+            state = "finished";
+          }
+        }
+      } else if (state === "repRest") {
+        // After rep rest, move to next training rep
+        currentRep++;
+        state = "training";
+        phaseDuration = trainingDuration;
+        phaseStartTime = millis()/1000;
+        playBeep(); // signal training rep start
+      } else if (state === "seriesRest") {
+        // After series rest, move to next series
+        currentSeries++;
+        currentRep = 1;
+        state = "training";
+        phaseDuration = trainingDuration;
+        phaseStartTime = millis()/1000;
+        playBeep(); // signal training rep start
+      }
+    }
+
+    // Function to play a short beep using p5.Oscillator
+    function playBeep() {
+      let osc = new p5.Oscillator('sine');
+      osc.freq(600);
+      osc.amp(0.5);
+      osc.start();
+      // Stop the oscillator after 100ms
+      setTimeout(() => { osc.stop(); }, 100);
+    }
+
+    // Adjust canvas size when window is resized
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
